@@ -568,8 +568,7 @@ class EVSign():
 		obs_b={}
 		Z = {}
 		featnamesorted = (self.aafeats_names + self.seqfeats_names +  list(self.repeats.keys()) + list(self.motifs.keys()))
-
-		output_file_path=self.outdir+"_ES_INDELS_"+str(self.use_indels)+"_"+self.aln_dir.split(os.sep)[-2]+".out.txt"
+		output_file_path = self.outdir+ "ES_INDELS"+""+str(self.use_indels)+"_"+os.path.basename(self.aln_dir.rstrip("/"))+".out.txt"
 		if os.path.exists(output_file_path):  # Check if file exists
 			os.remove(output_file_path)       # Delete the file if it exists
 			print(f"Deleted existing file: {output_file_path}")
