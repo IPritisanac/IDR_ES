@@ -63,7 +63,7 @@ Alternatively, you can use Anaconda, as detailed below.
 
 6. Run run_es.py: Once you've installed conda and the necessary packages, go to "CLASSES" directory (i.e. IDR_ES-main/CLASSES/). Then type in your terminal/command prompt:
    
-      python run_es.py input_file.txt
+      python run_es.py src/utils/input_file.txt
 
 Note: If you've created and activated a new environment, make sure it's activated before running the script!
 
@@ -77,4 +77,4 @@ Julie Forman-Kay (forman[at]sickkids.ca), The Hospital for Sick Children
 
 **Known bugs**
 
-method random_int in es_pw_sim.py --> if AA probabilities given to limited precision (.2/.4 floating points) -- does not return an integer but 'NoneType' Future treatment: Exception upstream Current treatment: Provide AA probabilities with long precision
+method random_int in src/core/es_pw_sim.py --> if AA probabilities given to limited precision (.2/.4 floating points) -- does not return an integer but 'NoneType' Future treatment: Exception upstream Current treatment: Provide AA probabilities with long precision
