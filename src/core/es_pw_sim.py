@@ -716,20 +716,20 @@ class EVSign():
 					Z[mfa][f+" meanZ"]=mz
 
 				# FOR VARIANCE Z-scores
-				obssd=np.nanstd(obs[mfa][f])
-				simsd=np.nanstd(sv[f])
-				elogv=np.nanmean(sv[f])
+				#obssd=np.nanstd(obs[mfa][f])
+				#simsd=np.nanstd(sv[f])
+				#elogv=np.nanmean(sv[f])
 
-				if ((simsd=="") or (not simsd > self.min_sd)):
-					simsd=self.min_sd
-				if (elogv<float(2)*math.log(self.min_sd)):
+				#if ((simsd=="") or (not simsd > self.min_sd)):
+				#	simsd=self.min_sd
+				#if (elogv<float(2)*math.log(self.min_sd)):
 					#adding a small number here
-					elogv=float(2)*math.log(self.min_sd)
-				if ((obssd=="") or (not obssd > self.min_sd)):
-					obssd=self.min_sd
+				#	elogv=float(2)*math.log(self.min_sd)
+				#if ((obssd=="") or (not obssd > self.min_sd)):
+				#	obssd=self.min_sd
 
-				vz = (float(2)*math.log(obssd) - elogv)/simsd
-				Z[mfa][f+" varZ"]=vz
+				#vz = (float(2)*math.log(obssd) - elogv)/simsd
+				#Z[mfa][f+" varZ"]=vz
 
 			outres.write(mfa +"\t")
 			outres.write("\t".join([str(Z[mfa][f+" meanZ"]) for f in featnamesorted]))
