@@ -33,9 +33,9 @@ in your terminal/command prompt. If it's not installed, you can follow the instr
 
           pip install numpy scipy
 
-6. Run run_es.py: Once you have Python installed along with the necessary site-packages, you can run run_es.py from the command line. **NOTE** When running the script, be in "CLASSES" directory, i.e., on path IDR_ES-main/CLASSES/. Then type in your terminal/command prompt:
+6. Run run_es.py: Once you have Python installed along with the necessary site-packages, you can run run_es.py from the command line. **NOTE** When running the script, provide the full path to input_file.txt i.e., src/utils/input_file.txt. Type in your terminal/command prompt:
 
-          python run_es.py input_file.txt
+          python run_es.py src/utils/input_file.txt
 
 Alternatively, you can use Anaconda, as detailed below.
 
@@ -68,7 +68,7 @@ Alternatively, you can use Anaconda, as detailed below.
 Note: If you've created and activated a new environment, make sure it's activated before running the script!
 
 **Output**
-The ES calculation will create an output file in a directory from which run_es.py is run (i.e. "CLASSES" directory). The output file lists IDR files from the directory specified under "align_dir" in the input file and the respective Z-scores, which are listed on the same line as the identifier of the IDR alignment file.
+The ES calculation will create an output directory with an output file in a directory from which run_es.py is run. The output file lists IDR files from the directory specified under "align_dir" in the input file and the respective Z-scores, which are listed on the same line as the identifier of the IDR alignment file.
 
 **Authors**
 Iva Pritisanac (iva.pritisanac[at]gmail.com), Medical University of Graz 
