@@ -8,14 +8,15 @@ To start looking at the global IDR-ome map, search for proteins of interest and 
     -- install Java TreeView (http://jtreeview.sourceforge.net/)
     
 Use
-    ES_PW/ANALYSES/clustering.py
+    src/core/make_cluster3_lm.py
 
    to generate clusters automatically at different thresholding levels
     
 Use 
-    ES_PW/ANALYSES/es_analyses.py 
+    src/core/es_analyses.py 
 
   for automatic analysis of GO terms and evolutionary conserved feature enrichments for clusters of interest
 
-Please note: The tutorial (Tutorial_ES.pdf) includes the instructions of how to run the code from a command line on Linux or Windows and how to organize directories so that
-everything runs smoothly
+Please note: The tutorial (Tutorial_ES.pdf) includes the instructions of how to run the code from a command line on Linux or Windows and how to organize directories so that everything runs as it should
+
+This file will be updated with more detailed instructions
