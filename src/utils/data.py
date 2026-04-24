@@ -18,7 +18,8 @@ class ParseInput(Parser):
         self.add('exp_motifs_n_file','exp_motifs_file','str',"")
         self.add('repeats_file','repeats_file','str',"")
         self.add('aa_freq_file','aa_freq_file','str',"")
-        self.add('align_dir','aln_dir','str',"") # path to directory with alignment files
+        self.add('align_dir','aln_dir','str',"") # path to directory with alignment files (used by ES protocol)
+        self.add('fasta_dir','fasta_dir','str',"") # path to a single FASTA file containing all IDR sequences (used by FS protocol)
 
         self.add('use_indels','use_indels','str',"on")
         self.add('n_simulations','n_sim','int',1000)
@@ -52,9 +53,32 @@ class ParseInput(Parser):
             raise Exception("AA frequency file does not exist or the path to the file is incorrect!")
             sys.exit(0)
 
-        if not os.path.isdir(self.aln_dir):
-            raise Exception("Alignment directory does not exist or the path to the directory is incorrect!")
-            sys.exit(0)
+        # align_dir (ES protocol) and fasta_dir (FS protocol) are validated independently.
+        # Only the one required by the chosen protocol needs to be set; the other may be left empty.
+        # At least one of them must be provided; if supplied, each must point at the expected type.
+        if (self.aln_dir == "") and (self.fasta_dir == ""):
+            raise Exception("Neither 'align_dir' (ES) nor 'fasta_dir' (FS) is set in the input file. "
+                            "Provide the one matching the protocol you intend to run.")
+
+        if self.aln_dir != "":
+            if not os.path.isdir(self.aln_dir):
+                raise Exception("'align_dir' does not exist or is not a directory: %s" % self.aln_dir)
+            # Must contain at least one alignment file (.fa/.fasta, case-insensitive)
+            aln_exts = (".fa", ".fasta")
+            aln_hits = [f for f in os.listdir(self.aln_dir)
+                        if f.lower().endswith(aln_exts) and os.path.isfile(os.path.join(self.aln_dir, f))]
+            if len(aln_hits) == 0:
+                raise Exception("'align_dir' contains no alignment file (*.fa / *.fasta): %s" % self.aln_dir)
+
+        if self.fasta_dir != "":
+            if not os.path.isdir(self.fasta_dir):
+                raise Exception("'fasta_dir' does not exist or is not a directory: %s" % self.fasta_dir)
+            # Must contain at least one FASTA file (.fa/.fasta, case-insensitive)
+            fasta_exts = (".fa", ".fasta")
+            fasta_hits = [f for f in os.listdir(self.fasta_dir)
+                          if f.lower().endswith(fasta_exts) and os.path.isfile(os.path.join(self.fasta_dir, f))]
+            if len(fasta_hits) == 0:
+                raise Exception("'fasta_dir' contains no FASTA file (*.fa / *.fasta): %s" % self.fasta_dir)
 
         if self.n_sim =="":
             """

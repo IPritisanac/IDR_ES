@@ -82,7 +82,8 @@ class EVSign():
 		self.repeats=PP.repeats
 		self.motifs=PP.motifs
 		self.motifs_expect=PP.motifs_expect
-		self.aln_dir=PP.aln_dir
+		self.aln_dir=PP.aln_dir       # directory of per-IDR alignment files (ES protocol)
+		self.fasta_dir=PP.fasta_dir   # directory containing a FASTA file with all IDR sequences (FS protocol)
 		self.aa_freq=PP.aa_freq
 		self.max_indel_size=PP.max_indel_size
 		self.indel_prob=PP.indel_prob
@@ -384,7 +385,7 @@ class EVSign():
 
 
 
-	##//KNOWN BUG// -- if AA probabilities given to limited precision
+	##//KNOWN BUG// -- if AA probabilities given to a limited precision
 	##		-- does not return a number 0-19 but 'NoneType'
 	def random_int(self,pr):
 		#print(pr)
@@ -404,10 +405,10 @@ class EVSign():
 		for a in r:
 			if (a in aalist):
 				matchpr += freq[a]
-		startpr=matchpr*matchpr ## probability that a repeat starts (i.e., two residues need to match
+		startpr=matchpr*matchpr ## probability that a repeat starts (i.e., two residues need to match)
 		repeatpr = [float(0)] #repeat can't start at the first poisition
 		for pos in range(1,L-1):
-			repeatpr.append( startpr + repeatpr[pos-1]*matchpr )    ##looks like some kind of geometric series...
+			repeatpr.append( startpr + repeatpr[pos-1]*matchpr )    ## geometric-series like
 		repeatpr.append( repeatpr[L-2]*matchpr ) #...or at the last position
 
 		return sum(repeatpr)
@@ -563,7 +564,7 @@ class EVSign():
 			ex_rep_res = {r:self.expected_repeat_residues(self.repeats[r][0],self.aa_freq, len(refs)) for r in list(self.repeats.keys())}
 
 			ugseqs = {}
-			sequences_to_use = self.seq_choosing_heuristic(ALN,ALN.names[REF_NUM],self.aa_freq,self.dist_ratio,self.dist_tot,self.len_factor) ### this should do all the quality control
+			sequences_to_use = self.seq_choosing_heuristic(ALN,ALN.names[REF_NUM],self.aa_freq,self.dist_ratio,self.dist_tot,self.len_factor) ###do all the basic quality controls
 
 			print(str(len(sequences_to_use))+' sequences passed filtering')
 
@@ -738,3 +739,130 @@ class EVSign():
 				outres.write("\t".join([str(Z[mfa][f+" varZ"]) for f in featnamesorted]))
 			outres.write("\n")
 		print("Completed computation of ES for IDRs in dir %s"%(self.aln_dir))	#print("TOOK %s SECONDS"%(time.time()-start_time))
+
+
+	def _compute_features_for_seq(self, seq):
+		"""
+		Compute raw (unnormalized) feature values for a single ungapped sequence string.
+		Returns: dict {feature_name: value}
+		"""
+		vals = {}
+
+		# AA feature block
+		aas = self.count_aa(seq)
+		aas = {a: float(aas[a]) for a in aas.keys()}
+		for j in range(len(self.aafeats)):
+			vals[self.aafeats_names[j]] = self.aafeats[j](aas)
+
+		# Repeat features (normalized like in original code)
+		for r in self.repeats.keys():
+			repregex = r.split("m=")[-1].replace('"', '')
+			er = self.expected_repeat_residues(self.repeats[r][0], self.aa_freq, len(seq))
+			repeatlength = 0
+			pat = re.compile(repregex)
+			for m in pat.finditer(seq):
+				repeatlength += len(m.group(0))
+			vals[r] = float(repeatlength) - er
+
+		# Motif features (normalized like in original code)
+		for mname in self.motifs.keys():
+			en = self.motifs_expect[mname]
+			if (not self.motifs[mname][-1] == "$"):
+				en *= float(len(seq) - len(self.motifs[mname]))
+			pat = re.compile("".join(self.motifs[mname]))
+			vals[mname] = float(len(pat.findall(seq))) - en
+
+		# Sequence features
+		for j in range(len(self.seqfeats)):
+			vals[self.seqfeats_names[j]] = self.seqfeats[j](seq)
+
+		return vals
+
+	# Feature Signatures (FS) protocol:
+	#  - self.fasta_dir is a DIRECTORY that contains a FASTA file with all IDR sequences (IDRome)
+	#  - computes per-feature global mean/std across all sequences
+	#  - writes out per-sequence Z-scores: Z = (value - mean_all) / std_all  (std floored at self.min_sd).
+	def compute_fs_seq(self):
+		if (self.fasta_dir == "") or (not os.path.isdir(self.fasta_dir)):
+			raise ValueError(f"Expected a directory path in self.fasta_dir, got '{self.fasta_dir}'")
+
+		# Locate the FASTA file inside self.fasta_dir (*.fa / *.fasta, case-insensitive)
+		fasta_exts = (".fa", ".fasta")
+		fasta_files = sorted([f for f in os.listdir(self.fasta_dir)
+		                      if f.lower().endswith(fasta_exts) and os.path.isfile(os.path.join(self.fasta_dir, f))])
+		if len(fasta_files) == 0:
+			raise ValueError(f"No FASTA file (*.fa / *.fasta) found in fasta_dir: '{self.fasta_dir}'")
+		if len(fasta_files) > 1:
+			print(f"WARNING: multiple FASTA files found in {self.fasta_dir}: {fasta_files}. Using '{fasta_files[0]}'.")
+		fasta_path = os.path.join(self.fasta_dir, fasta_files[0])
+		print(f"FS protocol: reading sequences from {fasta_path}")
+
+		start_time = time.time()
+
+		# Read FASTA
+		ALN = Alignment()
+		ALN.read_mfa(fasta_path)
+		# De-gapped sequences and filter trivial/bad ones (keep consistent with earlier code style)
+		seqs = {}
+		for name in ALN.names:
+			seq = ALN.seq[name].replace("-", "")
+			if (len(seq) >= 1) and ('X' not in seq):   # keep basic quality control 
+				seqs[name] = seq
+
+		if len(seqs) == 0:
+			raise ValueError("No usable sequences found in the FASTA file.")
+
+		# Feature list
+		featnamesorted = (self.aafeats_names +
+		                  self.seqfeats_names +
+		                  list(self.repeats.keys()) +
+		                  list(self.motifs.keys()))
+
+		# Output file
+		fasta_base = os.path.basename(fasta_path)
+		output_file_path = self.outdir + os.sep + "FS_" + fasta_base + ".out.txt"
+		if os.path.exists(output_file_path):
+			os.remove(output_file_path)
+			print(f"Deleted existing file: {output_file_path}")
+
+		# First pass - compute raw feature values per sequence, and collect per-feature lists
+		per_seq_values = {}  # {seq_id: {feat: value}}
+		feat_to_values = {f: [] for f in featnamesorted}
+
+		for seq_id, seq in seqs.items():
+			vals = self._compute_features_for_seq(seq)
+			per_seq_values[seq_id] = vals
+			for f in featnamesorted:
+				feat_to_values[f].append(vals[f])
+
+		# Compute global mean and std (floor std by self.min_sd)
+		feat_mean = {}
+		feat_std = {}
+		for f in featnamesorted:
+			mu = float(np.nanmean(feat_to_values[f])) if len(feat_to_values[f]) > 0 else float("nan")
+			sd = float(np.nanstd(feat_to_values[f])) if len(feat_to_values[f]) > 0 else float("nan")
+			if (not (sd > self.min_sd)) or np.isnan(sd):
+				sd = float(self.min_sd)
+			feat_mean[f] = mu
+			feat_std[f] = sd
+
+		# Compute Z per sequence
+		Z = {}  # {seq_id: {f+" meanZ": z}}
+		for seq_id, vals in per_seq_values.items():
+			Z[seq_id] = {}
+			for f in featnamesorted:
+				z = (vals[f] - feat_mean[f]) / feat_std[f]
+				Z[seq_id][f + " meanZ"] = z
+
+		# Write output
+		with open(output_file_path, "a") as outres:
+			outres.write("SEQ_ID\t")
+			outres.write("\t".join([str(f) + "_meanZ" for f in featnamesorted]))
+			outres.write("\n")
+			for seq_id in per_seq_values.keys():
+				outres.write(seq_id + "\t")
+				outres.write("\t".join([str(Z[seq_id][f + " meanZ"]) for f in featnamesorted]))
+				outres.write("\n")
+
+		print(f"Computed Z-scores for {len(per_seq_values)} sequences from FASTA {fasta_base} "
+		      f"in {int(time.time()-start_time)}s. Output: {output_file_path}")

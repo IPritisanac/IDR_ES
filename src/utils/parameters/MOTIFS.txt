@@ -81,7 +81,7 @@ id=T_homorep	m=T{5,}
 id=V_homorep	m=V{5,}
 id=Y_homorep	m=Y{5,}
 id=FG_rich	m=[FG].FG
-id=PY	m=PY
+id=PY	m=[RKH].{2,5}PY
 id=FRG	m=[FR]G
 id=SGFYSG	m=[SG][FY][SG]
 id=PG_rich	m=G..[GP][PG]

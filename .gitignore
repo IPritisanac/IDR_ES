@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments / tooling
+.venv/
+*.egg-info/
+
+# Runtime outputs
+output/
