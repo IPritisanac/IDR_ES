@@ -7,7 +7,7 @@ aa_freq_file  src/utils/parameters/AA_COMPOSITION.txt
 # ES protocol: directory with one alignment file per IDR
 align_dir data/idr_aln/
 # FS protocol: directory that contains a single FASTA file (*.fa / *.fasta) with all IDR sequences (uncomment to use)
-#fasta_dir data/idrome_fasta/
+fasta_dir data/idrome_fasta/
 use_indels	on
 n_simulations	1000
 #DEFAULTS

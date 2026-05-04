@@ -1,5 +1,5 @@
 """
-__authors__: Alan Moses, Khaled Elemam & Iva Pritisanac
+__authors__: Alan Moses, Iva Pritisanac & Khaled Elemam 
 """
 import math
 import numpy as np
@@ -21,11 +21,11 @@ class SequenceFeatures:
 
 	def get_seqfeats(self):
 		#self.seqfeats = {"SCD": self.sequence_charge_decoration, "my_kappa": self.my_kappa, "my_omega": self.my_omega}
-
-		self.seqfeats_names = ["SCD", "kappa*", "omega*","aromatic_spacing*","omega_aromatic*"]
-		self.seqfeats = [self.sequence_charge_decoration, self.my_kappa,self.my_omega,self.my_aromspace,self.my_omega_aromatic]
+		#self.seqfeats_names = ["SCD", "kappa*", "omega*","aromatic_spacing*","omega_aromatic*"]
+		self.seqfeats_names = ["SCD", "kappa*", "omega*"]
+		#self.seqfeats = [self.sequence_charge_decoration, self.my_kappa,self.my_omega,self.my_aromspace,self.my_omega_aromatic]
+		self.seqfeats = [self.sequence_charge_decoration, self.my_kappa,self.my_omega]
 		#return seqfeats
-
 
 	def net_charge(self, freq): ##computes the net charge from the frequences of residues
 		nc=float(0)			## freq should be a dict with amino acid keys and counts/numbers as values
