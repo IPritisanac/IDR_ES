@@ -8,8 +8,39 @@ __pycache__/
 
 # Environments / tooling
 .venv/
+.venv*/
+venv/
+env/
 *.egg-info/
+.ipynb_checkpoints/
 
-# Runtime outputs
+# Runtime outputs (gitignored to avoid accidentally committing large
+# computed artefacts; the app + scripts re-create these on demand)
 output/
-streamlit_app/
+
+# Local copies of the Zenodo data folder (canonical home is Zenodo, see
+# README → "Get the data"). Anything under these names is excluded so the
+# repo never accidentally bloats with the 2+ GB IDR-ome dataset.
+ZENODO/
+**/ZENODO/
+zenodo_data/
+**/zenodo_data/
+
+# Big binary / archive blobs that should travel via Zenodo, not git.
+# Sample / tutorial data committed deliberately under data/ remains
+# tracked because it is small.
+*.zip
+*.tar
+*.tar.gz
+*.7z
+*.rar
+
+# Per-IDR alignment dumps if the user mounts them locally
+IDR_ALN/
+**/IDR_ALN/
+
+# Cluster3.0 / JavaTreeView intermediates
+*.cdt
+*.gtr
+*.atr
+*.jtv

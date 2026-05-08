@@ -32,6 +32,66 @@ Both protocols are implemented in `src/core/es_pw_sim.py` (class `EVSign`) and a
 - Computes the raw value of every feature for every IDR (`_compute_features_for_seq`), then normalizes each feature by its global mean and standard deviation across all IDRs in the FASTA file (standard deviation is floored at `MIN_SD`).
 - Returns per-sequence **mean Z-scores** for all features.
 
+## Companion data (Zenodo)
+
+This repository ships only the analysis code. The full IDR-ome dataset that the paper analyses — the global Z-score map, the per-correlation cluster archives, the per-IDR alignments, the supplementary datasets — lives on Zenodo:
+
+> **Pritisanac, I.** *Data repository associated with 'A Functional Map of the Human Intrinsically Disordered Proteome'.* Zenodo. [https://doi.org/10.5281/zenodo.10812874](https://doi.org/10.5281/zenodo.10812874)
+
+The DOI above is the *concept* DOI — it always resolves to the latest published version of the deposit. The current version (v3) bundles ten archives totalling ~335 MB:
+
+| Archive | Size | What's in it |
+|---|---|---|
+| `ES_MAP.zip` | 12 MB | clustered IDR-ome map (`HUMAN_ES.txt`, `HUMAN_ES.gtr`) |
+| `CLUSTERS_AUTO.zip` | 76 MB | per-threshold (0.4–0.8) cluster archives + `AUTO_GO_FEATS.xlsx` |
+| `CLUSTERS_EXPLORE.zip` | 10 MB | 93 manually exported / exploratory clusters |
+| `DATASETS.zip` | 3 MB | supplementary datasets S1–S8 |
+| `IDR_ALN.zip` | 200 MB | 19,459 ortholog alignments per IDR |
+| `IDROME_SEQUENCES.zip` | 10 MB | proteome + IDRome FASTA, SPOT-Disorder boundaries |
+| `FAIDR_TSTATS.zip` | <1 MB | FAIDR t-stat hierarchical clustering |
+| `FAIDR_HIGH_AUC_PPV_GO.zip` | 22 MB | 148 high-quality FAIDR target files |
+| `PROTEIN_GROUPS_FAIDR_TARGETS.zip` | 2 MB | FAIDR target groups |
+| `TUTORIAL.zip` | <1 MB | Cluster3.0 / JavaTreeView tutorial PDF |
+
+To fetch everything into a local folder you can point the Streamlit app at, run from the repo root:
+
+    python download_zenodo.py --target ./ZENODO
+
+The script (which has no third-party dependencies) calls Zenodo's public API, downloads each archive in the deposit, and unpacks the `.zip` files into `./ZENODO/`. Optional flags:
+
+- `--no-extract` — keep the archives without unpacking.
+- `--only ES_MAP DATASETS CLUSTERS_AUTO IDROME` — only download files whose names contain those substrings (handy if you want to skip the 200 MB `IDR_ALN.zip`).
+- `--record <id>` — pin to a specific version, e.g. `--record 20076448` for v3, instead of the default concept ID `10812874`.
+
+After the download you should have the layout the Streamlit app and the analysis scripts expect:
+
+    ZENODO/
+        MAP/HUMAN_ES.txt              # full IDR-ome Z-score map (CDT format)
+        MAP/HUMAN_ES.gtr              # dendrogram from Cluster3.0
+        CLUSTERS_AUTO/CLUSTERS_0p4.zip … 0p8.zip
+        CLUSTERS_AUTO/AUTO_GO_FEATS.xlsx
+        IDROME_SEQUENCES/UP000005640_9606_SPOTD_MIN_30AA.fasta
+        IDR_ALN/<UniProt>_…_ALN_IDR_<start>_<end>.fa
+        DATASETS/DatasetS1.xlsx … S8.xlsx
+
+Set `IDR_ES_ZENODO=/abs/path/to/ZENODO` (or paste the path into the sidebar of the Streamlit app) and you're ready to go.
+
+## Streamlit explorer
+
+A small interactive web app, [`streamlit_app/`](streamlit_app/README.md), lets you:
+
+- look up an IDR by gene name / UniProt / IDR ID and see its 144-feature Z-score profile,
+- browse the automatic clusters at any of the 0.4–0.8 correlation thresholds, _or_ the manually selected clusters from Dataset S2,
+- inspect the supplementary datasets (S1–S8), including a directional-query viewer for the FAIDR per-IDR×GO-term assignment matrix.
+
+After downloading the data:
+
+    cd streamlit_app
+    pip install -r requirements.txt
+    streamlit run app.py
+
+See [`streamlit_app/README.md`](streamlit_app/README.md) for details.
+
 ## Installation / dependencies
 
 The code can be run on Linux / macOS / Windows with Python 3 and the `numpy` and `scipy` packages installed.
