@@ -34,15 +34,16 @@ Both protocols are implemented in `src/core/es_pw_sim.py` (class `EVSign`) and a
 
 ## Companion data (Zenodo)
 
-This repository ships only the analysis code. The full IDR-ome dataset that the paper analyses — the global Z-score map, the per-correlation cluster archives, the per-IDR alignments, the supplementary datasets — lives on Zenodo:
+This repository contains the code for ES/FS computation. 
+The full human IDR-ome dataset that the paper analyses — the global (ES) Z-score map, the cluster(s) archives, per-IDR alignments, and supplementary datasets are available on Zenodo:
 
 > **Pritisanac, I.** *Data repository associated with 'A Functional Map of the Human Intrinsically Disordered Proteome'.* Zenodo. [https://doi.org/10.5281/zenodo.10812874](https://doi.org/10.5281/zenodo.10812874)
 
-The DOI above is the *concept* DOI — it always resolves to the latest published version of the deposit. The current version (v3) bundles ten archives totalling ~335 MB:
+The DOI above is the *concept* DOI, which always resolves to the latest published version of the deposit. The current version (v4) bundles ten archives totalling ~350 MB:
 
 | Archive | Size | What's in it |
 |---|---|---|
-| `ES_MAP.zip` | 12 MB | clustered IDR-ome map (`HUMAN_ES.txt`, `HUMAN_ES.gtr`) |
+| `ES_MAP.zip` | 23 MB | clustered IDR-ome map (`HUMAN_ES.txt`, `HUMAN_ES.gtr`, `HUMAN_ES.cdt`) |
 | `CLUSTERS_AUTO.zip` | 76 MB | per-threshold (0.4–0.8) cluster archives + `AUTO_GO_FEATS.xlsx` |
 | `CLUSTERS_EXPLORE.zip` | 10 MB | 93 manually exported / exploratory clusters |
 | `DATASETS.zip` | 3 MB | supplementary datasets S1–S8 |
@@ -57,10 +58,10 @@ To fetch everything into a local folder you can point the Streamlit app at, run 
 
     python download_zenodo.py --target ./ZENODO
 
-The script (which has no third-party dependencies) calls Zenodo's public API, downloads each archive in the deposit, and unpacks the `.zip` files into `./ZENODO/`. Optional flags:
+The script calls Zenodo's public API, downloads each archive in the deposit, and unpacks the `.zip` files into `./ZENODO/`. Optional flags:
 
 - `--no-extract` — keep the archives without unpacking.
-- `--only ES_MAP DATASETS CLUSTERS_AUTO IDROME` — only download files whose names contain those substrings (handy if you want to skip the 200 MB `IDR_ALN.zip`).
+- `--only ES_MAP DATASETS CLUSTERS_AUTO IDROME` — only download files whose names contain those substrings (if you want to skip the 200 MB `IDR_ALN.zip`).
 - `--record <id>` — pin to a specific version, e.g. `--record 20076448` for v3, instead of the default concept ID `10812874`.
 
 After the download you should have the layout the Streamlit app and the analysis scripts expect:
@@ -78,11 +79,11 @@ Set `IDR_ES_ZENODO=/abs/path/to/ZENODO` (or paste the path into the sidebar of t
 
 ## Streamlit explorer
 
-A small interactive web app, [`streamlit_app/`](streamlit_app/README.md), lets you:
+An interactive web app, [`streamlit_app/`](streamlit_app/README.md), lets you:
 
 - look up an IDR by gene name / UniProt / IDR ID and see its 144-feature Z-score profile,
-- browse the automatic clusters at any of the 0.4–0.8 correlation thresholds, _or_ the manually selected clusters from Dataset S2,
-- inspect the supplementary datasets (S1–S8), including a directional-query viewer for the FAIDR per-IDR×GO-term assignment matrix.
+- browse the automatic clusters at any of the 0.4–0.8 correlation thresholds, _or_ the manually selected clusters from Dataset S2 (PNAS 2026, Supplementary Datasets),
+- inspect the Supplementary datasets (S1–S8), including a directional-query viewer for the FAIDR per-IDR×GO-term assignment matrix.
 
 After downloading the data:
 
@@ -119,7 +120,7 @@ Alternatively, with Anaconda:
 
 ## Running
 
-`run_es.py` now takes **two arguments**: the input file, and the protocol to execute (`ES` or `FS`). It validates the protocol name, instantiates `EVSign`, checks that the corresponding path variable is set in the input file, and then calls either `compute_es_dir()` or `compute_fs_seq()`.
+`run_es.py` takes **two arguments**: the input file, and the protocol to execute (`ES` or `FS`). It validates the protocol name, instantiates `EVSign`, checks that the corresponding path variable is set in the input file, and then calls either `compute_es_dir()` or `compute_fs_seq()`.
 
     python run_es.py <input_file> <ES|FS>
 
