@@ -39,6 +39,7 @@ def run_faidr_cv(
     features_path=None,
     specificity=0.99,
     n_reps=100,
+    show_progress=False,
 ):
     target_file = Path(target_file)
     filename = Path(features_path) if features_path is not None else Path(FEATURE_DEFAULTS[feature_type])
@@ -58,9 +59,19 @@ def run_faidr_cv(
             gene2row.append([])
         gene2row[gene2idx[gene]].append(i)
 
+    idr_index = data.index
     X = data.iloc[:, 2:].to_numpy(dtype=float)
+    del data
 
-    initw = np.zeros(len(data))  # will store initial weights
+    targets = pd.read_csv(target_file, sep="\t").set_index("idr_name", drop=False).loc[idr_index]
+    y = targets.iloc[:, 1].to_numpy(dtype=float)
+    category_name = re.sub(r"\.(txt|tsv)$", "", target_file.name)
+    
+    ro.r.assign("X_faidr", ro.r.matrix(ro.FloatVector(X.ravel()), nrow=X.shape[0], ncol=X.shape[1], byrow=True))
+    ro.r.assign("y_faidr", ro.FloatVector(y))
+    X_r = ro.r["X_faidr"]
+
+    initw = np.zeros(len(X))  # will store initial weights
     multi = []
     for g in range(len(gene2row)):
         initw[gene2row[g][0]] = 1
@@ -68,20 +79,22 @@ def run_faidr_cv(
             multi.append(g + 1)
             initw[gene2row[g]] = 1 / len(gene2row[g])  # downweight them all equally
 
-    targets = pd.read_csv(target_file, sep="\t").set_index("idr_name", drop=False).loc[data.index]
-    y = targets.iloc[:, 1].to_numpy(dtype=float)
-    category_name = re.sub(r"\.(txt|tsv)$", "", target_file.name)
+    def _r_train_rows(train_ind):
+        ro.r.assign("i_tr", ro.IntVector((np.asarray(train_ind, dtype=int) + 1).tolist()))
+        return ro.r("X_faidr[i_tr,,drop=FALSE]"), ro.r("y_faidr[i_tr]")
 
     def fit_FAIDR(train_ind, initw, lam):
+        X_train, y_train = _r_train_rows(train_ind)
         w, z, pr, w1 = initw.copy(), None, None, None
-        mod = glmnet.glmnet(p2r(X[train_ind, :]), p2r(y[train_ind]), family="gaussian", weights=p2r(w[train_ind]))  # intial model
+        mod = glmnet.glmnet(X_train, y_train, family="gaussian", weights=p2r(w[train_ind]))  # intial model
         for i in range(20):
             for j in range(5):  # M-step: fit the weighted logistic regression by iterative least squares
-                pr = 1 / (1 + np.exp(-np.asarray(r_predict(mod, p2r(X), s=lam)).ravel()))
+                pred_lin = np.asarray(r_predict(mod, X_r, s=lam)).ravel()
+                pr = 1 / (1 + np.exp(-pred_lin))
                 w1 = pr * (1 - pr)
                 w1[w1 == 0] = np.exp(-20)  # avoid 0s
-                z = np.asarray(r_predict(mod, p2r(X), s=lam)).ravel() + (y - pr) / w1
-                mod = glmnet.glmnet(p2r(X[train_ind, :]), p2r(z[train_ind]), family="gaussian", weights=p2r((w1 * w)[train_ind]))
+                z = pred_lin + (y - pr) / w1
+                mod = glmnet.glmnet(X_train, p2r(z[train_ind]), family="gaussian", weights=p2r((w1 * w)[train_ind]))
             for g in multi:  # E-step: recalculate weights given latest model
                 rows = gene2row[g - 1]
                 w[rows] = y[rows] * pr[rows] + (1 - y[rows]) * (1 - pr[rows])
@@ -90,7 +103,7 @@ def run_faidr_cv(
 
     lam, N_splits = 0.2, 6
     Tstats = np.zeros((X.shape[1] + 1, 1))
-    PostIDR, Pred, geney = np.zeros(len(data)), np.zeros(len(gene2row)), np.zeros(len(gene2row))
+    PostIDR, Pred, geney = np.zeros(len(X)), np.zeros(len(gene2row)), np.zeros(len(gene2row))
 
     IDR_level_pr = pd.DataFrame({"idr_name": targets["idr_name"].values, "pr": 0.0})
     IDR_level_pred_counts = pd.DataFrame({"idr_name": targets["idr_name"].values, "pred": 0.0})
@@ -100,10 +113,14 @@ def run_faidr_cv(
         geney[g] = y[gene2row[g][0]]
 
     auc_cv_reps = np.zeros(N_reps)
-    roc_cv_list = [None] * N_reps
-    for rep in range(N_reps):
+    roc_cv_curves = []
+    cv_reps = range(N_reps)
+    if show_progress:
+        from tqdm.auto import tqdm
+        cv_reps = tqdm(cv_reps, desc="Step 1/2 — Cross-validation (ROC / AUC)", unit="run")
+    for rep in cv_reps:
         gene_split_assign = np.array(base.cut(base.sample(ro.IntVector(list(range(1, len(gene2row) + 1)))), breaks=N_splits, labels=ro.r("FALSE")), dtype=int)
-        unbiased_pr = np.full(len(data), np.nan)
+        unbiased_pr = np.full(len(X), np.nan)
         for this_split in range(1, N_splits + 1):
             in_split = np.where(gene_split_assign == this_split)[0] + 1
             not_split = np.where(gene_split_assign != this_split)[0] + 1
@@ -115,24 +132,31 @@ def run_faidr_cv(
             train_neg = np.concatenate([gene2row[g - 1] for g in neg_genes])
             train = np.concatenate([train_pos, train_neg])
             split_fit = fit_FAIDR(train, initw, lam)
-            split_pr = 1 / (1 + np.exp(-np.asarray(r_predict(split_fit["mod"], p2r(X), s=lam)).ravel()))
+            split_pr = 1 / (1 + np.exp(-np.asarray(r_predict(split_fit["mod"], X_r, s=lam)).ravel()))
             unbiased_pr[test_pos], unbiased_pr[test_neg] = split_pr[test_pos], split_pr[test_neg]
         mask = ~np.isnan(unbiased_pr)
-        roc_cv_list[rep] = pROC.roc(p2r(y[mask].astype(float)), p2r(unbiased_pr[mask].astype(float)))
-        auc_cv_reps[rep] = float(np.asarray(pROC.auc(roc_cv_list[rep])).ravel()[0])
+        roc_cv = pROC.roc(p2r(y[mask].astype(float)), p2r(unbiased_pr[mask].astype(float)), quiet=True)
+        auc_cv_reps[rep] = float(np.asarray(pROC.auc(roc_cv)).ravel()[0])
+        fpr = 1 - np.asarray(roc_cv.rx2("specificities"), dtype=float)
+        tpr = np.asarray(roc_cv.rx2("sensitivities"), dtype=float)
+        order = np.argsort(fpr)
+        roc_cv_curves.append((fpr[order], tpr[order]))
 
     classi_info[0, 4] = auc_cv_reps.mean()
     fig, ax = plt.subplots()
-    for rep in range(N_reps):
-        roc_cv = roc_cv_list[rep]
-        ax.plot(1 - np.asarray(roc_cv.rx2("specificities"), dtype=float), np.asarray(roc_cv.rx2("sensitivities"), dtype=float), color=(0.23, 0.45, 0.71, 0.2), linewidth=0.8)
+    for fpr, tpr in roc_cv_curves:
+        ax.plot(fpr, tpr, color=(0.23, 0.45, 0.71, 0.2), linewidth=0.8)
     ax.set_xlabel("False Positive Rate")
     ax.set_ylabel("True Positive Rate")
     ax.set_title(f"CV ROC ({N_reps} reps), mean AUC = {auc_cv_reps.mean():.3f}")
     fig.tight_layout()
     plt.show()
 
-    for rep in range(N_reps):
+    final_reps = range(N_reps)
+    if show_progress:
+        from tqdm.auto import tqdm
+        final_reps = tqdm(final_reps, desc="Step 2/2 — Final training (IDR predictions)", unit="run")
+    for rep in final_reps:
         train_pos = np.where(y == 1)[0]  # use all the positives
         gene_neg = np.array(base.sample(ro.IntVector(np.where(geney == 0)[0] + 1), size=int(geney.sum() * Balance)), dtype=int) - 1
         train = np.concatenate([train_pos, np.concatenate([gene2row[g] for g in gene_neg])])
@@ -150,14 +174,14 @@ def run_faidr_cv(
             ro.r.assign("z_glm", z); ro.r.assign("subX_glm", subX); ro.r.assign("w_glm", w * w1)
             tstats = np.asarray(ro.r("summary(glm(z_glm ~ subX_glm, weights=w_glm))$coefficients[,3]"), dtype=float).ravel()
             Tstats[np.concatenate([[0], np.where(cols)[0] + 1]), 0] = tstats
-        roc_train = pROC.roc(p2r(y[train].astype(float)), p2r(pr[train].astype(float)))
+        roc_train = pROC.roc(p2r(y[train].astype(float)), p2r(pr[train].astype(float)), quiet=True)
         specificities, thresholds = np.asarray(roc_train.rx2("specificities"), dtype=float), np.asarray(roc_train.rx2("thresholds"), dtype=float)
         thresh = thresholds[np.where(specificities > Specificity)[0].min()]
         classi_info[0, 2] = float(classi_info[0, 2]) + len(np.intersect1d(np.where(y == 1)[0], np.where(pr > thresh)[0])) / N_reps
         classi_info[0, 3] = float(classi_info[0, 3]) + len(np.intersect1d(np.where(y == 0)[0], np.where(pr > thresh)[0])) / N_reps
         classi_info[0, 1] = float(classi_info[0, 1]) + thresh / N_reps
         prot_idx = np.concatenate([np.where(geney == 1)[0], gene_neg])
-        classi_info[0, 5] = float(classi_info[0, 5]) + float(np.asarray(pROC.auc(pROC.roc(p2r(geney[prot_idx].astype(float)), p2r(Pred[prot_idx].astype(float))))).ravel()[0]) / N_reps
+        classi_info[0, 5] = float(classi_info[0, 5]) + float(np.asarray(pROC.auc(pROC.roc(p2r(geney[prot_idx].astype(float)), p2r(Pred[prot_idx].astype(float)), quiet=True))).ravel()[0]) / N_reps
         IDR_level_pr["pr"] = IDR_level_pr["pr"] + pr / N_reps
         IDR_level_pred_counts["pred"] = IDR_level_pred_counts["pred"] + (pr > thresh) / N_reps
 
@@ -173,8 +197,8 @@ def run_faidr_cv(
 
     out_dir = Path("FAIDR_output") / category_name
     out_dir.mkdir(parents=True, exist_ok=True)
-    classi_info_df.to_csv(out_dir / "IDR_classification_bal_control_no_cv.txt", sep="\t", index=False)
-    idr_results.to_csv(out_dir / "IDR_level_results.tsv", sep="\t", index=False)
+    classi_info_df.to_csv(out_dir / "run_summary.tsv", sep="\t", index=False)
+    idr_results.to_csv(out_dir / "idr_predictions.tsv", sep="\t", index=False)
 
     return {"classi_info": classi_info_df, "idr_results": idr_results, "out_dir": out_dir}
 

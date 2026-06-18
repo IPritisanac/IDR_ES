@@ -1,9 +1,9 @@
+# Python 3.10–3.12 recommended (best compatibility with rpy2)
 rpy2>=3.5
 pandas>=2.0
 numpy>=1.26
 matplotlib>=3.8
-openpyxl>=3.1
-ipykernel>=6.29
-jupyter>=1.0
-matplotlib>=3.8
 matplotlib-venn>=1.0
+tqdm>=4.66
+jupyter>=1.0
+ipykernel>=6.29
