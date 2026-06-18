@@ -19,3 +19,7 @@ GO0005730_nucleolus_FAIDR_output_validation/
 IDR_above_cut_bal_control*.txt
 IDR_classification_bal_control*.txt
 IDR_probability_eq1_bal_control*.txt
+
+# R vs Python verification artifacts
+verify_*.tsv
+verify_*.log

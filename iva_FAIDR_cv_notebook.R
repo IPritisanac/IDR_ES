@@ -66,7 +66,7 @@ fit_FAIDR<-function(train_ind,initw,lam) {
 
 lam <- 0.2;
 N_splits <- 6;
-N_reps<-100
+N_reps<-as.integer(Sys.getenv("N_REPS", unset = "100"))
 Balance <- 3;
 Specificity <- 0.99;
 Tstats<-matrix(nr=(length(X[1,])+1), nc=1);
@@ -105,10 +105,12 @@ for (rep in 1:N_reps) {
   auc_cv_reps[rep]<-as.numeric(auc(roc_cv_list[[rep]]))
 }
 classi_info[1,5] <- mean(auc_cv_reps)
+if (Sys.getenv("SKIP_PLOT", unset = "") != "1") {
 plot(roc_cv_list[[1]], col=adjustcolor("steelblue", 0.2), lwd=0.8, legacy.axes=TRUE,
      main=sprintf("CV ROC (%d reps), mean AUC = %.3f", N_reps, mean(auc_cv_reps)))
 for (rep in 2:N_reps) {
   lines(roc_cv_list[[rep]], col=adjustcolor("steelblue", 0.2), lwd=0.8)
+}
 }
 
 for (rep in 1:N_reps) {
