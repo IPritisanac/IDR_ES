@@ -10,9 +10,12 @@ from rpy2.robjects.packages import importr
 glmnet, pROC, base = importr("glmnet"), importr("pROC"), importr("base")
 r_predict, r_coef, p2r = ro.r["predict"], ro.r["coef"], numpy2ri.py2rpy
 
+FEATURE_DIR = Path(__file__).resolve().parent / "feature_matrices"
+
 FEATURE_DEFAULTS = {
-    "evolutionary": "HUMAN_ES.txt",
-    "signature": "FS_UP000005640_9606_SPOTD_MIN_30AA.txt",
+    "evolutionary": FEATURE_DIR / "HUMAN_ES.txt",
+    "signature": FEATURE_DIR / "FS_UP000005640_9606_SPOTD_MIN_30AA.txt",
+    "rohit": FEATURE_DIR / "Rohit's_features.tsv",
 }
 
 
@@ -25,10 +28,7 @@ def uniprot_from_idr(idr_name):
 def _load_features(path):
     data = pd.read_csv(path, sep="\t").fillna(0)  # set missing data to 0. R's regression models don't always work well with missing data.
     if "idr_name" not in data.columns:
-        if "SEQ_ID" not in data.columns:
-            raise ValueError(f"{path}: expected idr_name or SEQ_ID column")
-        data = data[data.get("GID", "").astype(str) != "EWEIGHT"]
-        data = data.assign(idr_name=data["SEQ_ID"])
+        raise ValueError(f"{path}: expected idr_name column")
     data = data[data["idr_name"].notna() & data["idr_name"].astype(str).str.len().gt(0)]
     return data.set_index("idr_name", drop=False)
 
@@ -39,6 +39,7 @@ def run_faidr_cv(
     features_path=None,
     specificity=0.99,
     n_reps=100,
+    consistency_cutoff=0.5,
     show_progress=False,
 ):
     target_file = Path(target_file)
@@ -46,6 +47,7 @@ def run_faidr_cv(
 
     N_reps = int(n_reps if os.environ.get("N_REPS", "") == "" else os.environ.get("N_REPS", n_reps))
     Balance, Specificity = 3, float(specificity)
+    consistency_cutoff = float(consistency_cutoff)
 
     base.set_seed(1)
 
@@ -60,13 +62,13 @@ def run_faidr_cv(
         gene2row[gene2idx[gene]].append(i)
 
     idr_index = data.index
-    X = data.iloc[:, 2:].to_numpy(dtype=float)
+    X = data.iloc[:, 1:].to_numpy(dtype=float)
     del data
 
     targets = pd.read_csv(target_file, sep="\t").set_index("idr_name", drop=False).loc[idr_index]
     y = targets.iloc[:, 1].to_numpy(dtype=float)
     category_name = re.sub(r"\.(txt|tsv)$", "", target_file.name)
-    
+
     ro.r.assign("X_faidr", ro.r.matrix(ro.FloatVector(X.ravel()), nrow=X.shape[0], ncol=X.shape[1], byrow=True))
     ro.r.assign("y_faidr", ro.FloatVector(y))
     X_r = ro.r["X_faidr"]
@@ -142,7 +144,6 @@ def run_faidr_cv(
         order = np.argsort(fpr)
         roc_cv_curves.append((fpr[order], tpr[order]))
 
-    classi_info[0, 4] = auc_cv_reps.mean()
     fig, ax = plt.subplots()
     for fpr, tpr in roc_cv_curves:
         ax.plot(fpr, tpr, color=(0.23, 0.45, 0.71, 0.2), linewidth=0.8)
@@ -175,6 +176,7 @@ def run_faidr_cv(
             tstats = np.asarray(ro.r("summary(glm(z_glm ~ subX_glm, weights=w_glm))$coefficients[,3]"), dtype=float).ravel()
             Tstats[np.concatenate([[0], np.where(cols)[0] + 1]), 0] = tstats
         roc_train = pROC.roc(p2r(y[train].astype(float)), p2r(pr[train].astype(float)), quiet=True)
+        classi_info[0, 4] = float(classi_info[0, 4]) + float(np.asarray(pROC.auc(roc_train)).ravel()[0]) / N_reps
         specificities, thresholds = np.asarray(roc_train.rx2("specificities"), dtype=float), np.asarray(roc_train.rx2("thresholds"), dtype=float)
         thresh = thresholds[np.where(specificities > Specificity)[0].min()]
         classi_info[0, 2] = float(classi_info[0, 2]) + len(np.intersect1d(np.where(y == 1)[0], np.where(pr > thresh)[0])) / N_reps
@@ -186,7 +188,7 @@ def run_faidr_cv(
         IDR_level_pred_counts["pred"] = IDR_level_pred_counts["pred"] + (pr > thresh) / N_reps
 
     classi_info[0, 6] = y.sum()
-    classi_info_df = pd.DataFrame([classi_info[0]], columns=["category", "thresh", "above_thresh_in_annotated", "above_thresh_not_in_annotated", "IDR_AUC_CV", "Prot_AUC_CV", "N_annotated_IDRs"])
+    classi_info_df = pd.DataFrame([classi_info[0]], columns=["category", "thresh", "above_thresh_in_annotated", "above_thresh_not_in_annotated", "IDR_AUC_train", "Prot_AUC_train", "N_annotated_IDRs"])
 
     idr_results = pd.DataFrame({
         "uniprot_accession": [uniprot_from_idr(x) for x in IDR_level_pr["idr_name"]],
@@ -199,19 +201,28 @@ def run_faidr_cv(
     out_dir.mkdir(parents=True, exist_ok=True)
     classi_info_df.to_csv(out_dir / "run_summary.tsv", sep="\t", index=False)
     idr_results.to_csv(out_dir / "idr_predictions.tsv", sep="\t", index=False)
+    idr_results_filtered = idr_results[idr_results["consistency_fraction"] >= consistency_cutoff]
+    filtered_path = out_dir / f"idr_predictions_consistency_{consistency_cutoff:g}.tsv"
+    idr_results_filtered.to_csv(filtered_path, sep="\t", index=False)
 
-    return {"classi_info": classi_info_df, "idr_results": idr_results, "out_dir": out_dir}
+    return {
+        "classi_info": classi_info_df,
+        "idr_results": idr_results,
+        "idr_results_filtered": idr_results_filtered,
+        "out_dir": out_dir,
+    }
 
 
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--target-file", default="HIGH_AUC_PPV_FILTERED_FUNCTIONS/GO0005730_nucleolus.tsv")
+    parser.add_argument("--target-file", default="annotation_targets/GO0005730_nucleolus.tsv")
     parser.add_argument("--feature-type", choices=sorted(FEATURE_DEFAULTS), default="evolutionary")
     parser.add_argument("--features-path", default=None)
     parser.add_argument("--specificity", type=float, default=0.99)
     parser.add_argument("--n-reps", type=int, default=100)
+    parser.add_argument("--consistency-cutoff", type=float, default=0.5)
     args = parser.parse_args()
     run_faidr_cv(
         target_file=args.target_file,
@@ -219,4 +230,5 @@ if __name__ == "__main__":
         features_path=args.features_path,
         specificity=args.specificity,
         n_reps=args.n_reps,
+        consistency_cutoff=args.consistency_cutoff,
     )
