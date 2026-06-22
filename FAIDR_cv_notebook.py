@@ -144,12 +144,15 @@ def run_faidr_cv(
         order = np.argsort(fpr)
         roc_cv_curves.append((fpr[order], tpr[order]))
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(3.42, 3.42))
+    ax.plot([0, 1], [0, 1], color='#aaaaaa', linewidth=0.75, linestyle='--', zorder=0)
     for fpr, tpr in roc_cv_curves:
-        ax.plot(fpr, tpr, color=(0.23, 0.45, 0.71, 0.2), linewidth=0.8)
-    ax.set_xlabel("False Positive Rate")
-    ax.set_ylabel("True Positive Rate")
-    ax.set_title(f"CV ROC ({N_reps} reps), mean AUC = {auc_cv_reps.mean():.3f}")
+        ax.plot(fpr, tpr, color='#2166ac', alpha=0.15, linewidth=0.6)
+    ax.set_xlabel("False positive rate")
+    ax.set_ylabel("True positive rate")
+    ax.set_title(f"CV ROC — {N_reps} reps  |  mean AUC = {auc_cv_reps.mean():.3f}")
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
     fig.tight_layout()
     plt.show()
 
