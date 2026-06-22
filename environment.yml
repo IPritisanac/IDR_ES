@@ -1,0 +1,17 @@
+name: faidr
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.10,<3.13
+  - r-base>=4.2
+  - rpy2>=3.5.13,<4.0
+  - r-glmnet
+  - r-proc
+  - pandas>=2.0,<3.0
+  - numpy>=1.26,<3.0
+  - matplotlib>=3.8,<4.0
+  - matplotlib-venn>=0.11
+  - tqdm>=4.66,<5.0
+  - jupyter>=1.0
+  - ipykernel>=6.29

@@ -1,9 +1,19 @@
-# Python 3.10–3.12 recommended (best compatibility with rpy2)
-rpy2>=3.5
-pandas>=2.0
-numpy>=1.26
-matplotlib>=3.8
-matplotlib-venn>=1.0
-tqdm>=4.66
+# Python 3.10–3.12 required (rpy2 is not compatible with Python 3.13+).
+# R ≥ 4.2 must be installed before running pip install:
+#   macOS:   brew install r
+#   Linux:   sudo apt install r-base  (or use your cluster module)
+#   Windows: https://cran.r-project.org
+#
+# Recommended: use the conda environment instead — it installs R,
+# R packages (glmnet, pROC), and all Python dependencies in one step:
+#   conda env create -f environment.yml
+#   conda activate faidr
+
+rpy2>=3.5.13,<4.0
+pandas>=2.0,<3.0
+numpy>=1.26,<3.0
+matplotlib>=3.8,<4.0
+matplotlib-venn>=0.11
+tqdm>=4.66,<5.0
 jupyter>=1.0
 ipykernel>=6.29
