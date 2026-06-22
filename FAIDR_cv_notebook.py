@@ -15,7 +15,7 @@ FEATURE_DIR = Path(__file__).resolve().parent / "feature_matrices"
 FEATURE_DEFAULTS = {
     "evolutionary": FEATURE_DIR / "HUMAN_ES.txt",
     "signature": FEATURE_DIR / "FS_UP000005640_9606_SPOTD_MIN_30AA.txt",
-    "rohit": FEATURE_DIR / "Rohit's_features.tsv",
+    "ruff_et_al": FEATURE_DIR / "ruff_et_al_features.tsv",
 }
 
 
