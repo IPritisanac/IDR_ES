@@ -3,12 +3,6 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import rpy2.robjects as ro
-import rpy2.robjects.numpy2ri as numpy2ri
-from rpy2.robjects.packages import importr
-
-glmnet, pROC, base = importr("glmnet"), importr("pROC"), importr("base")
-r_predict, r_coef, p2r = ro.r["predict"], ro.r["coef"], numpy2ri.py2rpy
 
 FEATURE_DIR = Path(__file__).resolve().parent / "feature_matrices"
 
@@ -42,6 +36,12 @@ def run_faidr_cv(
     consistency_cutoff=0.5,
     show_progress=False,
 ):
+    import rpy2.robjects as ro
+    import rpy2.robjects.numpy2ri as numpy2ri
+    from rpy2.robjects.packages import importr
+    glmnet, pROC, base = importr("glmnet"), importr("pROC"), importr("base")
+    r_predict, r_coef, p2r = ro.r["predict"], ro.r["coef"], numpy2ri.py2rpy
+
     target_file = Path(target_file)
     filename = Path(features_path) if features_path is not None else Path(FEATURE_DEFAULTS[feature_type])
 
