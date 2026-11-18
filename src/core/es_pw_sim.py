@@ -181,7 +181,7 @@ class EVSign():
 		for x in freq.values():
 			ss += x*x
 		beta=float(1)/(float(1)-ss)
-		alnpairs = zip(list(s1),list(s2))
+		alnpairs = list(zip(list(s1),list(s2)))  # list, not one-shot iterator: reused in grid loop below
 
 		ilogL=float(0)
 		for aa1, aa2 in alnpairs:
